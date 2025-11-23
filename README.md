@@ -1,4 +1,4 @@
-# A Game Made for the Basis China 2025 Network Hackathon
+# A Game Made for the Basis China 2025 Network Hackathon available at [hg.richardsblogs.com](https://hg.richardsblogs.com)
 ## Overview
 It is an immersive, browser-based fantasy game where players pilot an orb to collect elemental orbs, triggering reactions to score points. The objective is to reach 10,000 points as quickly as possible by navigating a dynamic terrain and strategically combining elements. Inspired by *Flappy Bird* for its gameplay mechanics and *Genshin Impact* for its elemental reaction system, the game offers intuitive controls, engaging visuals, and a rich audio experience.
 ## Features
