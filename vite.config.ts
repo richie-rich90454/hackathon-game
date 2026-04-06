@@ -17,6 +17,7 @@ export default defineConfig({
 		cssMinify: true,
 		chunkSizeWarningLimit: 2000,
 		rolldownOptions: {
+			treeshake: true,
 			output: {
 				codeSplitting: true,
 				manualChunks(id){
