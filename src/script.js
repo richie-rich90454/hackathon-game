@@ -1,3 +1,5 @@
+import * as Tone from "tone";
+import "./bgm";
 $(document).ready(function(){
     $("#startModal").show();
     $("#controls-toggle").hide();
@@ -99,16 +101,11 @@ $(document).ready(function(){
         console.error("Canvas error, refresh to try again.");
         return;
     }
-    try{
-        state.synth=new Tone.PolySynth(Tone.Synth).toDestination();
-        Tone.start();
-    }
-    catch (e){
-        console.warn("Tone.js initialization failed:", e);
-    }
-    $("#startButton").click(function(){
+    $("#startButton").click(async function(){
         $("#startModal").hide();
         $("#controls-toggle").show();
+        await Tone.start();
+        state.synth=new Tone.PolySynth(Tone.Synth).toDestination();
         state.startTime=Date.now();
         loop();
     });
