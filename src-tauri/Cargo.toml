@@ -1,10 +1,10 @@
 [package]
-name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+name = "hackathon-game"
+version = "4.0.0"
+description = "A game inspired by Minecraft and RPG games in general."
+authors = ["richie-rich90454"]
+license = "apache-2.0"
+repository = "hackathon-game"
 edition = "2021"
 rust-version = "1.77.2"
 
