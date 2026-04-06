@@ -1,16 +1,17 @@
-import {PolySynth, FMSynth, Transport, now, start as toneStart} from "tone";
+import {PolySynth, FMSynth, now, start as toneStart, Loop} from "tone";
 import {Midi} from "@tonejs/midi";
 
 let isPlaying=false;
 let midiData: Midi|null=null;
 let synth: PolySynth<FMSynth>|null=null;
+let midiLoop: Loop|null=null;
 
 async function initAudio(){
 	synth=new PolySynth(FMSynth,{
 		harmonicity: 3,
 		modulationIndex: 10,
 		oscillator:{
-			type: "sine"
+			type: "sine" as const
 		},
 		envelope:{
 			attack: 0.002,
@@ -19,7 +20,7 @@ async function initAudio(){
 			release: 1.5
 		},
 		modulation:{
-			type: "triangle"
+			type: "triangle" as const
 		},
 		modulationEnvelope:{
 			attack: 0.002,
@@ -45,18 +46,25 @@ async function startMusic(){
 	if (!midiData) midiData=await loadMidi();
 	if (!midiData) return;
 	await toneStart();
-	Transport.cancel();
-	let scheduleNotes=(time: number)=>{
-		midiData!.tracks.forEach(track=>{
-			track.notes.forEach(n=> synth!.triggerAttackRelease(n.name, n.duration, time+n.time, n.velocity*0.75));
+	midiLoop?.stop();
+	let startTime=now()+0.1;
+	midiData.tracks.forEach(track=>{
+		track.notes.forEach(n=>{
+			synth!.triggerAttackRelease(n.name, n.duration, startTime+n.time, n.velocity*0.75);
 		});
-	};
-	let nowTime=now()+0.1;
-	scheduleNotes(nowTime);
-	Transport.scheduleRepeat(scheduleNotes, midiData.duration);
-	if (midiData.header.tempos.length) Transport.bpm.value=midiData.header.tempos[0].bpm;
-	Transport.timeSignature=[3, 4];
-	Transport.start(nowTime);
+	});
+	midiLoop=new Loop((time)=>{
+		midiData!.tracks.forEach(track=>{
+			track.notes.forEach(n=>{
+				synth!.triggerAttackRelease(n.name, n.duration, time+n.time, n.velocity*0.75);
+			});
+		});
+	}, midiData.duration);
+	midiLoop.start(startTime);
+	if (midiData.header.tempos.length){
+		let bpm=midiData.header.tempos[0].bpm;
+		synth!.context.transport.bpm.value=bpm;
+	}
 	isPlaying=true;
 }
 window.addEventListener("DOMContentLoaded", async ()=>{
