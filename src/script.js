@@ -1,4 +1,3 @@
-//terser script.js -o script.min.js --compress --mangle
 $(document).ready(function(){
     $("#startModal").show();
     $("#controls-toggle").hide();

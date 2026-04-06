@@ -1,4 +1,3 @@
-//terser bgm.js -o bgm.min.js --compress --mangle
 let isPlaying=false;
 let midiData=null;
 let synth=null;
