@@ -1,5 +1,5 @@
 import $ from "jquery";
-import { PolySynth, Synth, start, now } from "tone";
+import {PolySynth, Synth, start, now} from "tone";
 import "./bgm";
 interface Config{
 	width: number;
