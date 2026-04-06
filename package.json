@@ -7,7 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "go run main.go",
     "dev": "vite dev",
-    "build": "vite build"
+    "build": "vite build",
+    "build:app": "vite build",
+    "app": "tauri dev"
   },
   "keywords": [],
   "author": "richie-rich90454",
