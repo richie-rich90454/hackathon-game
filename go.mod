@@ -2,7 +2,7 @@ module RandMatQuGeA
 
 go 1.25.0
 
-require github.com/gofiber/fiber/v2 v2.52.13
+require github.com/gofiber/fiber/v2 v2.52.14
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
