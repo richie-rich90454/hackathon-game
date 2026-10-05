@@ -1,12 +1,13 @@
 import {defineConfig} from "vite";
 import {readFileSync} from "fs";
-import {join} from "path";
 
-let packageJson=JSON.parse(readFileSync(join(__dirname,"package.json"),"utf-8"));
+let packageJson=JSON.parse(readFileSync(new URL("package.json", import.meta.url),"utf-8"));
 let version=packageJson.version;
 
 export default defineConfig({
 	root: "src",
+	// Relative asset URLs keep the built game working from a subfolder and from a local copy.
+	base: "./",
 	publicDir: "../public",
 	build: {
 		outDir: "../dist",
@@ -17,6 +18,11 @@ export default defineConfig({
 		cssMinify: true,
 		chunkSizeWarningLimit: 2000,
 		rolldownOptions: {
+			// Both pages are built, otherwise the rules page is silently missing from dist.
+			input: {
+				index: "index.html",
+				rules: "rules.html"
+			},
 			treeshake: true,
 			output: {
 				codeSplitting: true,
@@ -32,7 +38,7 @@ export default defineConfig({
 							let scoped=`${topLevel}/${parts[1]}`;
 							return `vendor-${scoped.replace("@","")}`;
 						}
-						if (["three"].includes(topLevel)){
+						if (["tone"].includes(topLevel)){
 							return `vendor-${topLevel}`;
 						}
 						return "vendor-other";
