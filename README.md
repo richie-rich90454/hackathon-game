@@ -21,30 +21,39 @@ To run it locally, follow these steps:
    npm install
    ```
 3. **Start the Server**:
-   The game uses Fastify to serve files. Run the server with:
+   The game uses Go with the Fiber web framework to serve the built files. Ensure Go is installed, then build the frontend and run the server with:
    ```bash
-   node server.js
+   npm run build
+   npm start
    ```
    The server will start at `http://localhost:6008`.
 4. **Access the Game**:
    Open a web browser and navigate to `http://localhost:6008`.
 ## Dependencies
-- **Node.js**: For running the Fastify server.
-- **Fastify**: Web server framework for serving game files.
-- **@fastify/static**: Serves static files (HTML, CSS, JS, etc.).
-- **@fastify/compress**: Compresses responses for faster delivery.
+- **Node.js**: Required to build the frontend with Vite.
+- **Go**: Hosts the Fiber web server that serves the game files.
+- **Fiber**: Web server framework for serving game files.
+- **Vite**: Bundles the frontend into `dist`.
 - **jQuery**: Handles DOM manipulation and touch controls.
 - **Tone.js**: Powers audio effects and music playback.
-- **Midi.js**: Processes MIDI files for background music.
+- **@tonejs/midi**: Processes MIDI files for background music.
 ## File Structure
-- `index.html`: Main game interface with canvas, modals, and controls.
-- `rules.html`: Detailed game rules and mechanics.
-- `script.js`: Core game logic, including rendering, physics, and reactions.
-- `bgm.js`: Background music handling with Tone.js and MIDI.
-- `server.js`: Fastify server configuration.
-- `NotoSans-VariableFont_wdth_wght.ttf`, `EBGaramond-VariableFont_wght.ttf`: Custom fonts for styling.
-- `HackathonGame.mid`: MIDI file for background music.
-- `favicon.ico`: Game favicon.
+- `src/index.html`: Main game interface with canvas, modals, and controls.
+- `src/rules.html`: Detailed game rules and mechanics.
+- `src/style.css`: Shared styling for the game pages.
+- `src/script.ts`: Core game logic, including rendering, physics, and reactions.
+- `src/bgm.ts`: Background music handling with Tone.js and MIDI.
+- `src/midi.ts`: The soundtrack embedded as a data URI, generated from `public/hackathon_game.mid`.
+- `vite.config.ts`: Vite build configuration (both pages, relative asset URLs).
+- `main.go`: Go/Fiber server that serves the built files from `dist`.
+- `public/NotoSans-VariableFont_wdth_wght.ttf`, `public/EBGaramond-VariableFont_wght.ttf`: Custom fonts for styling.
+- `public/hackathon_game.mid`: MIDI source for the background music.
+- `public/favicon.svg`: Vector logo, the primary icon for modern browsers.
+- `public/favicon.ico`, `public/favicon-16.png`, `public/favicon-32.png`, `public/favicon-48.png`, `public/favicon-64.png`, `public/favicon-192.png`, `public/favicon-512.png`, `public/favicon.png`, `public/apple-touch-icon.png`: Raster logo sizes generated from `favicon.svg` for older browsers, iOS and web manifests.
+- `public/safari-pinned-tab.svg`: Monochrome icon for Safari pinned tabs.
+- `public/robots.txt`: Crawler rules, points at the sitemap.
+- `public/sitemap.xml`: Sitemap for both pages.
+- `public/site.webmanifest`: Web app manifest so the game can be installed.
 ## Usage
 1. **Start the Game**:
    - On load, a modal welcomes players with instructions.
@@ -68,7 +77,9 @@ To run it locally, follow these steps:
 - **Elemental System**: Implements a reaction system inspired by *Genshin Impact*, with 15 unique reactions.
 - **Responsive Design**: Uses CSS media queries and `clamp()` for scalability across devices.
 - **Audio**: Tone.js generates sound effects for orb collection and reactions; MIDI-based music loops in the background.
-- **Server**: Fastify serves files with compression and no caching for development.
+- **Autoplay Policy**: Tone.js is imported on the first pointer or key interaction, so the browser allows the AudioContext to start and no autoplay warning is logged.
+- **Offline / Local Copies**: Everything (fonts, logo, music, scripts) is served from this repository, and asset URLs are relative, so a built copy also works straight from disk.
+- **Server**: Go/Fiber serves the built files from `dist`, revalidating pages and caching fingerprinted assets.
 ## License
 This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 ## Acknowledgments
