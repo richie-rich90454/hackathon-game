@@ -1,13 +1,14 @@
-import {PolySynth, FMSynth, now, start as toneStart, Loop} from "tone";
+import type {PolySynth as PolySynthType, FMSynth as FMSynthType, Loop as LoopType} from "tone";
 import {Midi} from "@tonejs/midi";
 
 let isPlaying=false;
+let starting=false;
 let midiData: Midi|null=null;
-let synth: PolySynth<FMSynth>|null=null;
-let midiLoop: Loop|null=null;
+let synth: PolySynthType<FMSynthType>|null=null;
+let midiLoop: LoopType|null=null;
 
-async function initAudio(){
-	synth=new PolySynth(FMSynth,{
+function initAudio(tone: typeof import("tone")){
+	synth=new tone.PolySynth(tone.FMSynth,{
 		harmonicity: 3,
 		modulationIndex: 10,
 		oscillator:{
@@ -30,51 +31,62 @@ async function initAudio(){
 		}
 	}).toDestination();
 }
-async function loadMidi(): Promise<Midi|null>{
-	try{
-		let res=await fetch("hackathon_game.mid");
-		let buf=await res.arrayBuffer();
-		return new Midi(buf);
+function decodeMidi(dataUri: string): Midi{
+	let base64=dataUri.slice(dataUri.indexOf(",")+1);
+	let binary=atob(base64);
+	let bytes=new Uint8Array(binary.length);
+	for (let i=0;i<binary.length;i++){
+		bytes[i]=binary.charCodeAt(i);
 	}
-	catch (e){
-		console.error("MIDI load failed:", e);
-		return null;
-	}
+	return new Midi(bytes);
 }
 async function startMusic(){
-	if (!synth) await initAudio();
-	if (!midiData) midiData=await loadMidi();
-	if (!midiData) return;
-	await toneStart();
-	midiLoop?.stop();
-	let startTime=now()+0.1;
-	midiData.tracks.forEach(track=>{
-		track.notes.forEach(n=>{
-			synth!.triggerAttackRelease(n.name, n.duration, startTime+n.time, n.velocity*0.75);
-		});
-	});
-	midiLoop=new Loop((time)=>{
-		midiData!.tracks.forEach(track=>{
-			track.notes.forEach(n=>{
-				synth!.triggerAttackRelease(n.name, n.duration, time+n.time, n.velocity*0.75);
+	if (isPlaying||starting) return;
+	starting=true;
+	try{
+		if (!midiData){
+			try{
+				let {MIDI_DATA_URI}=await import("./midi");
+				midiData=decodeMidi(MIDI_DATA_URI);
+			}
+			catch (e){
+				console.error("MIDI load failed:", e);
+				return;
+			}
+		}
+		// Tone builds its AudioContext while the module is evaluated, so it is imported on the
+		// first real interaction instead of on load. Autoplay policies then allow it to start.
+		let tone=await import("tone");
+		if (!synth) initAudio(tone);
+		await tone.start();
+		if (midiData.header.tempos.length){
+			let bpm=midiData.header.tempos[0].bpm;
+			synth!.context.transport.bpm.value=bpm;
+		}
+		midiLoop?.stop();
+		midiLoop?.dispose();
+		let startTime=tone.now()+0.1;
+		midiLoop=new tone.Loop((time)=>{
+			midiData!.tracks.forEach(track=>{
+				track.notes.forEach(n=>{
+					synth!.triggerAttackRelease(n.name, n.duration, time+n.time, n.velocity*0.75);
+				});
 			});
-		});
-	}, midiData.duration);
-	midiLoop.start(startTime);
-	if (midiData.header.tempos.length){
-		let bpm=midiData.header.tempos[0].bpm;
-		synth!.context.transport.bpm.value=bpm;
+		}, midiData.duration);
+		midiLoop.start(startTime);
+		isPlaying=true;
 	}
-	isPlaying=true;
+	finally{
+		starting=false;
+	}
 }
-window.addEventListener("DOMContentLoaded", async ()=>{
-	await initAudio();
-	await loadMidi();
-	let unlockAndPlay=async ()=>{
-		if (!isPlaying) await startMusic();
-		window.removeEventListener("click", unlockAndPlay);
+let unlockAndPlay=async ()=>{
+	await startMusic();
+	if (isPlaying&&synth&&synth.context.state=="running"){
+		window.removeEventListener("pointerdown", unlockAndPlay);
 		window.removeEventListener("keydown", unlockAndPlay);
-	};
-	window.addEventListener("click", unlockAndPlay);
-	window.addEventListener("keydown", unlockAndPlay);
-});
+	}
+};
+// Registered synchronously so the very first interaction is never missed.
+window.addEventListener("pointerdown", unlockAndPlay);
+window.addEventListener("keydown", unlockAndPlay);
