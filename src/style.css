@@ -87,7 +87,6 @@ p{
     font-size: clamp(.7rem, 2vw, .9rem);
 }
 #touch-controls{
-    display: none;
     position: fixed;
     bottom: calc(2rem + env(safe-area-inset-bottom, 0));
     left: 50%;
@@ -305,4 +304,9 @@ button:hover{
     font-size: clamp(.8rem, 2.5vw, 1rem);
     cursor: pointer;
     transition: opacity .3s;
+}
+@media (hover: none){
+    #controls-toggle{
+        opacity: .8;
+    }
 }
