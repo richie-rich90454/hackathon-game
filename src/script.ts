@@ -1,6 +1,9 @@
 import $ from "jquery";
-import {PolySynth, Synth, start, now} from "tone";
 import "./bgm";
+import type {PolySynth as PolySynthType} from "tone";
+// Tone is pulled in on the first interaction (see below) because it builds its AudioContext while
+// the module is evaluated. Until then these stay inert and the sound effects are simply silent.
+let now: ()=>number=()=>0;
 interface Config{
 	width: number;
 	height: number;
@@ -81,7 +84,7 @@ interface State{
 	elements: ElementType[];
 	reactions: Reaction[];
 	lastReactionMessage: { text: string; opacity: number; decay: number };
-	synth: PolySynth|null;
+	synth: PolySynthType|null;
 	lastSoundTime: number;
 	startTime: number|null;
 	maxSpeedUsed: number;
@@ -185,15 +188,20 @@ $(document).ready(function(){
 	};
 	let canvas=document.getElementById("gameCanvas") as HTMLCanvasElement;
 	let ctx=canvas.getContext("2d");
-	if (!ctx!){
+	if (!ctx){
 		console.error("Canvas error, refresh to try again.");
 		return;
 	}
+	let cursorSpeedEl=document.getElementById("cursor-speed")!;
+	let cursorMaxSpeedEl=document.getElementById("cursor-max-speed")!;
+	let cursorScoreEl=document.getElementById("cursor-score")!;
 	$("#startButton").click(async function(){
 		$("#startModal").hide();
 		$("#controls-toggle").show();
-		await start();
-		state.synth=new PolySynth(Synth).toDestination();
+		let tone=await import("tone");
+		await tone.start();
+		now=tone.now;
+		state.synth=new tone.PolySynth(tone.Synth).toDestination();
 		state.startTime=Date.now();
 		loop();
 	});
@@ -208,10 +216,10 @@ $(document).ready(function(){
 		canvas.width=config.width;
 		canvas.height=config.height;
 		state.player.x=config.width/4;
-		state.player.y=config.height/2;
+		clampPlayerY();
 		generateInitialTerrain();
 		state.balls.forEach(b=>{
-			b.y=Math.min(b.y, config.height-b.r);
+			b.y=Math.max(b.r, Math.min(config.height-b.r, b.y));
 		});
 	}
 	window.addEventListener("resize", resizeCanvas);
@@ -300,6 +308,10 @@ $(document).ready(function(){
 			e.preventDefault();
 		}
 	});
+	function clampPlayerY(){
+		let buffer=20;
+		state.player.y=Math.max(buffer, Math.min(config.height-buffer, state.player.y));
+	}
 	function handleControls(){
 		if (state.keys.faster){
 			state.player.maxSpeed=Math.min(state.player.maxSpeed+.05, 15);
@@ -319,8 +331,8 @@ $(document).ready(function(){
 			state.player.verticalVelocity*=state.player.friction;
 		}
 		state.player.verticalVelocity=Math.max(-state.player.maxVerticalSpeed, Math.min(state.player.maxVerticalSpeed, state.player.verticalVelocity));
-		let buffer=20;
-		state.player.y=Math.max(buffer, Math.min(config.height-buffer, state.player.y+state.player.verticalVelocity));
+		state.player.y+=state.player.verticalVelocity;
+		clampPlayerY();
 	}
 	function playCollectionSound(){
 		if (Date.now()-state.lastSoundTime<config.soundCooldown){
@@ -491,9 +503,9 @@ $(document).ready(function(){
 		renderReactionTimer();
 		ctx!.fillStyle="#FFF";
 		ctx!.font="16px \"EB Garamond\"";
-		document.getElementById("cursor-speed")!.innerHTML=`Speed: ${state.player.forwardSpeed.toFixed(2)}`;
-		document.getElementById("cursor-max-speed")!.innerHTML=`Max: ${state.player.maxSpeed.toFixed(2)}`;
-		document.getElementById("cursor-score")!.innerHTML=`Score: ${state.score}`;
+		cursorSpeedEl.textContent=`Speed: ${state.player.forwardSpeed.toFixed(2)}`;
+		cursorMaxSpeedEl.textContent=`Max: ${state.player.maxSpeed.toFixed(2)}`;
+		cursorScoreEl.textContent=`Score: ${state.score}`;
 		if (state.lastReactionMessage.text){
 			ctx!.globalAlpha=state.lastReactionMessage.opacity;
 			ctx!.fillStyle="#FFD800";
@@ -509,6 +521,9 @@ $(document).ready(function(){
 	}
 	function loop(){
 		update();
+		if (state.gameEnded){
+			return;
+		}
 		draw();
 		animationFrameId=requestAnimationFrame(loop);
 	}
@@ -521,12 +536,12 @@ $(document).ready(function(){
 		});
 	}
 	function spawnBall(){
-		let r=Math.random()*(config.ballMaxRadius-config.ballMinRadius)+config.ballMinRadius;
+		let r=(Math.random()*(config.ballMaxRadius-config.ballMinRadius)+config.ballMinRadius)*1.2;
 		let element=state.elements[Math.floor(Math.random()*state.elements.length)];
 		state.balls.push({
 			x: config.width+r,
 			y: Math.random()*(config.height-2*r)+r,
-			r: r*1.2,
+			r: r,
 			color: element.color,
 			element: element.name,
 			collectTimestamp: 0
@@ -549,45 +564,60 @@ $(document).ready(function(){
 			return b.x+b.r>0;
 		});
 	}
+	function findReaction(first: string, second: string): Reaction|null{
+		let ordered=state.reactions.find(r=>r.elements[0]==first&&r.elements[1]==second);
+		if (ordered){
+			return ordered;
+		}
+		return state.reactions.find(r=>r.elements[1]==first&&r.elements[0]==second)||null;
+	}
+	function rememberReactionProduct(name: string, timestamp: number){
+		if (!state.collectedElements.some(e=>e.name==name)){
+			state.collectedElements.push({name: name, timestamp: timestamp});
+		}
+	}
 	function checkReactions(newElement: string, basePoints: number){
 		let now=Date.now();
 		let reactionTriggered=false;
 		let auraConsumed=false;
-		if (state.player.aura){
-			for (let reaction of state.reactions){
-				let [elem1, elem2]=reaction.elements;
-				if ((state.player.aura==elem1&&newElement==elem2)||(state.player.aura==elem2&&newElement==elem1)){
-					let bonusPoints=0;
-					if (reaction.type=="amplifying"){
-						bonusPoints=Math.floor(basePoints*(reaction.multiplier!-1));
-					}
-					else if (reaction.type=="transformative"||reaction.type=="catalyze"){
-						bonusPoints=reaction.bonus!;
-					}
-					else if (reaction.type=="status"){
-						bonusPoints=reaction.bonus!;
-						state.player.aura="Frozen";
-						state.player.auraTimestamp=now;
-						auraConsumed=false;
-					}
-					state.score+=bonusPoints;
-					state.lastReactionMessage.text=`${reaction.name}!+${bonusPoints}`;
-					state.lastReactionMessage.opacity=1;
-					state.reactionCounts[reaction.name]=(state.reactionCounts[reaction.name]||0)+1;
-					playReactionSound(reaction.name);
-					reactionTriggered=true;
-					if (reaction.type!=="status"){
-						auraConsumed=true;
-					}
-					break;
+		let reactionProducts=state.reactions.map(r=>r.name);
+		let aura=state.player.aura;
+		if (aura){
+			let reaction=findReaction(aura, newElement);
+			if (reaction){
+				let bonusPoints=0;
+				if (reaction.type=="amplifying"){
+					bonusPoints=Math.floor(basePoints*(reaction.multiplier!-1));
+				}
+				else if (reaction.type=="transformative"||reaction.type=="catalyze"){
+					bonusPoints=reaction.bonus!;
+				}
+				else if (reaction.type=="status"){
+					bonusPoints=reaction.bonus!;
+					state.player.aura="Frozen";
+					state.player.auraTimestamp=now;
+					auraConsumed=false;
+				}
+				state.score+=bonusPoints;
+				state.lastReactionMessage.text=`${reaction.name}!+${bonusPoints}`;
+				state.lastReactionMessage.opacity=1;
+				state.reactionCounts[reaction.name]=(state.reactionCounts[reaction.name]||0)+1;
+				playReactionSound(reaction.name);
+				reactionTriggered=true;
+				if (reaction.type!=="status"){
+					auraConsumed=true;
+				}
+				if (reaction.type=="transformative"||reaction.type=="catalyze"){
+					rememberReactionProduct(reaction.name, now);
 				}
 			}
 		}
 		if (!reactionTriggered){
-			let validElements: CollectedElement[] = state.collectedElements.concat({name: newElement, timestamp: now });
+			let activeElements=state.collectedElements.filter(e=>now-e.timestamp<config.reactionWindow);
+			let validElements: CollectedElement[] = activeElements.concat({name: newElement, timestamp: now });
 			for (let reaction of state.reactions){
 				let [elem1, elem2]=reaction.elements;
-				if ((elem2=="Bloom"||elem2=="Quicken")&&validElements.some(e=>e.name==elem2)&&newElement==elem1){
+				if (reactionProducts.includes(elem2)&&validElements.some(e=>e.name==elem2)&&newElement==elem1){
 					let bonusPoints=reaction.bonus!;
 					state.score+=bonusPoints;
 					state.lastReactionMessage.text=`${reaction.name}!+${bonusPoints}`;
@@ -600,7 +630,7 @@ $(document).ready(function(){
 					break;
 				}
 			}
-			state.collectedElements=validElements.filter(e=>now-e.timestamp<config.reactionWindow);
+			state.collectedElements=validElements;
 		}
 		if (!reactionTriggered&&(!state.player.aura||auraConsumed)){
 			state.player.aura=newElement;
@@ -674,9 +704,9 @@ $(document).ready(function(){
 			state.keys[ctrl]=false;
 		},{passive:false});
 		btn.addEventListener("pointerleave", e=>{
-		e.preventDefault();
-		state.keys[ctrl]=false;
-		}, { passive: false });
+			e.preventDefault();
+			state.keys[ctrl]=false;
+		},{passive:false});
 	});
 	canvas.addEventListener("touchmove", e=>{
 		let t=e.touches[0];
@@ -698,5 +728,6 @@ $(document).ready(function(){
 		istouchControlsVisible=!istouchControlsVisible;
 		touchControls.slideToggle(200);
 		touchControlsToggleBtn.text(istouchControlsVisible?"Hide Controls":"Show Controls");
+		touchControlsToggleBtn.attr("aria-expanded", istouchControlsVisible?"true":"false");
 	});
 });
