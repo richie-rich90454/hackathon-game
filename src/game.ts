@@ -4,6 +4,7 @@ import {generateInitialTerrain, updateTerrain} from "./terrain";
 import {spawnBall, updateBalls} from "./orbs";
 import {draw} from "./render";
 let animationFrameId: number;
+let running=false;
 export function clampPlayerY(game: Game){
 	let {config, state}=game;
 	let buffer=20;
@@ -67,12 +68,26 @@ function update(game: Game){
 			decay: .05
 		});
 	}
-	state.trailParticles=state.trailParticles.filter(p=>p.opacity>0);
+	// Both of these used to be rebuilt with filter() every frame. They are compacted in place instead,
+	// which keeps the same contents without handing the collector a fresh array sixty times a second.
+	let kept=0;
+	for (let p of state.trailParticles){
+		if (p.opacity>0){
+			state.trailParticles[kept++]=p;
+		}
+	}
+	state.trailParticles.length=kept;
 	if (state.frame % config.ballSpawnInterval==0&&state.balls.length<config.maxBalls){
 		spawnBall(game);
 	}
 	let now=Date.now();
-	state.collectedElements=state.collectedElements.filter(e=>now-e.timestamp<config.reactionWindow);
+	let keptElements=0;
+	for (let e of state.collectedElements){
+		if (now-e.timestamp<config.reactionWindow){
+			state.collectedElements[keptElements++]=e;
+		}
+	}
+	state.collectedElements.length=keptElements;
 	if (state.player.aura&&now-state.player.auraTimestamp>config.reactionWindow){
 		state.player.aura=null;
 	}
@@ -111,6 +126,10 @@ function loop(game: Game){
 	animationFrameId=requestAnimationFrame(()=>loop(game));
 }
 export function startGame(game: Game){
+	// The start button stays clickable while its handler is still awaiting the audio import, and a
+	// second click would otherwise start a second frame loop on the same state.
+	if (running) return;
+	running=true;
 	game.state.startTime=Date.now();
 	loop(game);
 }
