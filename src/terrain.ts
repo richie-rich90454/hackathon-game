@@ -15,10 +15,15 @@ export function generateInitialTerrain(game: Game){
 }
 export function updateTerrain(game: Game, dx: number){
 	let {config, state}=game;
+	// Shifted and compacted in place, so scrolling does not reallocate the whole column list each frame.
+	let kept=0;
 	for (let p of state.terrain){
 		p.x-=dx;
+		if (p.x>-config.terrainSegmentWidth*2){
+			state.terrain[kept++]=p;
+		}
 	}
-	state.terrain=state.terrain.filter(p=>p.x>-config.terrainSegmentWidth*2);
+	state.terrain.length=kept;
 	let last=state.terrain[state.terrain.length-1];
 	while (last.x<config.width+config.terrainSegmentWidth){
 		let h=config.height-last.y+(Math.random()*2-1)*config.terrainMaxDelta*.5;
