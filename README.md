@@ -41,7 +41,17 @@ To run it locally, follow these steps:
 - `src/index.html`: Main game interface with canvas, modals, and controls.
 - `src/rules.html`: Detailed game rules and mechanics.
 - `src/style.css`: Shared styling for the game pages.
-- `src/script.ts`: Core game logic, including rendering, physics, and reactions.
+- `src/script.ts`: Entry point. Creates the config, state and canvas context, wires the buttons, resize listener and inputs, then hands over to the game loop.
+- `src/game.ts`: Resize handling, controls, the per frame update and the requestAnimationFrame loop.
+- `src/render.ts`: All canvas drawing, including the cached sky layer and the stats panel text.
+- `src/state.ts`: The shapes of the game state, the initial state, and the `Game` object the systems receive.
+- `src/config.ts`: The tunable values, as an interface plus defaults.
+- `src/data.ts`: The element and reaction tables.
+- `src/terrain.ts`: Terrain generation and scrolling.
+- `src/orbs.ts`: Orb spawning and collision detection.
+- `src/reactions.ts`: Reaction matching, chaining and scoring.
+- `src/sfx.ts`: Sound effects, one synth voice per timbre.
+- `src/input.ts`: Keyboard, swipe and on screen button handling.
 - `src/bgm.ts`: Background music handling with Tone.js and MIDI.
 - `src/midi.ts`: The soundtrack embedded as a data URI, generated from `public/hackathon_game.mid`.
 - `vite.config.ts`: Vite build configuration (both pages, relative asset URLs).
