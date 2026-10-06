@@ -16,19 +16,27 @@ export function spawnBall(game: Game){
 }
 export function updateBalls(game: Game, dx: number){
 	let {config, state}=game;
-	state.balls.forEach(b=>b.x-=dx);
-	state.balls=state.balls.filter(b=>{
-		let dx=state.player.x-b.x;
-		let dy=state.player.y-b.y;
-		let distance=Math.sqrt(dx*dx+dy*dy);
-		if (distance<b.r+config.planeSize){
+	let player=state.player;
+	// Orbs are moved, then tested and compacted in place. Squaring both sides of the collision test
+	// gives the same answer as comparing a square root, and keeps the list from being reallocated
+	// every frame.
+	let kept=0;
+	for (let b of state.balls){
+		b.x-=dx;
+		let px=player.x-b.x;
+		let py=player.y-b.y;
+		let reach=b.r+config.planeSize;
+		if (px*px+py*py<reach*reach){
 			playCollectionSound(game);
 			let basePoints=Math.floor(b.r*10);
 			state.score+=basePoints;
 			b.collectTimestamp=Date.now();
 			checkReactions(game, b.element, basePoints);
-			return false;
+			continue;
 		}
-		return b.x+b.r>0;
-	});
+		if (b.x+b.r>0){
+			state.balls[kept++]=b;
+		}
+	}
+	state.balls.length=kept;
 }
