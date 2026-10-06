@@ -73,12 +73,23 @@ function renderBalls(game: Game){
 		ctx.fill();
 	});
 }
+// The trail fades in fixed steps, so only a handful of distinct colours ever come out of it. They are
+// built once each and reused instead of formatting a new string per particle per frame.
+let trailColors=new Map<number, string>();
+function trailColor(opacity: number){
+	let color=trailColors.get(opacity);
+	if (color===undefined){
+		color=`rgba(255, 215, 0, ${opacity})`;
+		trailColors.set(opacity, color);
+	}
+	return color;
+}
 function renderTrail(game: Game){
 	let {ctx, state}=game;
 	ctx.save();
 	state.trailParticles.forEach((p, i)=>{
 		ctx.globalAlpha=p.opacity;
-		ctx.fillStyle=`rgba(255, 215, 0, ${p.opacity})`;
+		ctx.fillStyle=trailColor(p.opacity);
 		ctx.beginPath();
 		let radius=Math.max(0, p.size*(1-i*.05));
 		ctx.arc(p.x, p.y, radius, 0, Math.PI*2);
@@ -87,23 +98,41 @@ function renderTrail(game: Game){
 	});
 	ctx.restore();
 }
+// Both cursor gradients are built from constants only, so they are built once instead of twice a frame.
+interface CursorGradients{
+	outer: CanvasGradient;
+	inner: CanvasGradient;
+	outerRadius: number;
+	innerRadius: number;
+}
+let cursorGradients: CursorGradients|null=null;
+function ensureCursorGradients(game: Game): CursorGradients{
+	let {config, ctx}=game;
+	let outerRadius=config.cursorSize+config.cursorGlowRadius;
+	if (cursorGradients&&cursorGradients.outerRadius==outerRadius&&cursorGradients.innerRadius==config.cursorSize){
+		return cursorGradients;
+	}
+	let outer=ctx.createRadialGradient(0, 0, 0, 0, 0, outerRadius);
+	outer.addColorStop(0, "#FFF");
+	outer.addColorStop(1, config.cursorGradient[1]);
+	let inner=ctx.createRadialGradient(0, 0, 0, 0, 0, config.cursorSize);
+	inner.addColorStop(0, config.cursorGradient[0]);
+	inner.addColorStop(1, config.cursorGradient[1]);
+	cursorGradients={outer, inner, outerRadius, innerRadius: config.cursorSize};
+	return cursorGradients;
+}
 function renderOrbCursor(game: Game){
 	let {config, ctx, state}=game;
+	let gradients=ensureCursorGradients(game);
 	ctx.save();
 	ctx.translate(state.player.x, state.player.y);
 	let angle=Math.atan2(state.player.verticalVelocity, state.player.forwardSpeed);
 	ctx.rotate(angle);
-	let gradient=ctx.createRadialGradient(0, 0, 0, 0, 0, config.cursorSize+config.cursorGlowRadius);
-	gradient.addColorStop(0, "#FFF");
-	gradient.addColorStop(1, config.cursorGradient[1]);
-	ctx.fillStyle=gradient;
+	ctx.fillStyle=gradients.outer;
 	ctx.beginPath();
 	ctx.arc(0, 0, config.cursorSize+config.cursorGlowRadius, 0, Math.PI*2);
 	ctx.fill();
-	let innerGradient=ctx.createRadialGradient(0, 0, 0, 0, 0, config.cursorSize);
-	innerGradient.addColorStop(0, config.cursorGradient[0]);
-	innerGradient.addColorStop(1, config.cursorGradient[1]);
-	ctx.fillStyle=innerGradient;
+	ctx.fillStyle=gradients.inner;
 	ctx.beginPath();
 	ctx.arc(0, 0, config.cursorSize, 0, Math.PI*2);
 	ctx.fill();
@@ -139,13 +168,28 @@ function renderReactionTimer(game: Game){
 	ctx.fillText((timeLeft/1000).toFixed(1), 0, 0);
 	ctx.restore();
 }
+// These three values are read every frame but almost never change, and writing to the DOM invalidates
+// layout and repaints the stats panel, so each one is written only when its number actually moves.
+// The fillStyle and font assignments that used to sit above the writes were dead: nothing is drawn
+// between them and the reaction message, which sets both again before its own fillText.
+let lastSpeed=-1;
+let lastMaxSpeed=-1;
+let lastScore=-1;
 function renderStats(game: Game){
-	let {ctx, state}=game;
-	ctx.fillStyle="#FFF";
-	ctx.font="16px \"EB Garamond\"";
-	cursorSpeedEl.textContent=`Speed: ${state.player.forwardSpeed.toFixed(2)}`;
-	cursorMaxSpeedEl.textContent=`Max: ${state.player.maxSpeed.toFixed(2)}`;
-	cursorScoreEl.textContent=`Score: ${state.score}`;
+	let {state}=game;
+	let {forwardSpeed, maxSpeed}=state.player;
+	if (forwardSpeed!=lastSpeed){
+		lastSpeed=forwardSpeed;
+		cursorSpeedEl.textContent=`Speed: ${forwardSpeed.toFixed(2)}`;
+	}
+	if (maxSpeed!=lastMaxSpeed){
+		lastMaxSpeed=maxSpeed;
+		cursorMaxSpeedEl.textContent=`Max: ${maxSpeed.toFixed(2)}`;
+	}
+	if (state.score!=lastScore){
+		lastScore=state.score;
+		cursorScoreEl.textContent=`Score: ${state.score}`;
+	}
 }
 function renderReactionMessage(game: Game){
 	let {config, ctx, state}=game;
