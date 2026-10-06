@@ -1,5 +1,5 @@
 import $ from "jquery";
-import "./bgm";
+import {startMusic} from "./bgm";
 import type {PolySynth as PolySynthType} from "tone";
 // Tone is pulled in on the first interaction (see below) because it builds its AudioContext while
 // the module is evaluated. Until then these stay inert and the sound effects are simply silent.
@@ -198,6 +198,7 @@ $(document).ready(function(){
 	$("#startButton").click(async function(){
 		$("#startModal").hide();
 		$("#controls-toggle").show();
+		startMusic();
 		let tone=await import("tone");
 		await tone.start();
 		now=tone.now;

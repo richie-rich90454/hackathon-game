@@ -1,9 +1,9 @@
 import type {PolySynth as PolySynthType, FMSynth as FMSynthType, Loop as LoopType} from "tone";
-import {Midi} from "@tonejs/midi";
+import type {Midi as MidiType} from "@tonejs/midi";
 
 let isPlaying=false;
 let starting=false;
-let midiData: Midi|null=null;
+let midiData: MidiType|null=null;
 let synth: PolySynthType<FMSynthType>|null=null;
 let midiLoop: LoopType|null=null;
 
@@ -31,31 +31,27 @@ function initAudio(tone: typeof import("tone")){
 		}
 	}).toDestination();
 }
-function decodeMidi(dataUri: string): Midi{
+function decodeMidi(dataUri: string, MidiParser: typeof import("@tonejs/midi").Midi): MidiType{
 	let base64=dataUri.slice(dataUri.indexOf(",")+1);
 	let binary=atob(base64);
 	let bytes=new Uint8Array(binary.length);
 	for (let i=0;i<binary.length;i++){
 		bytes[i]=binary.charCodeAt(i);
 	}
-	return new Midi(bytes);
+	return new MidiParser(bytes);
 }
-async function startMusic(){
+// Called by the "Begin the Journey with Wonder!" button in script.ts. Nothing here touches Web
+// Audio until then, so the game stays completely silent until the player starts it.
+export async function startMusic(){
 	if (isPlaying||starting) return;
 	starting=true;
 	try{
 		if (!midiData){
-			try{
-				let {MIDI_DATA_URI}=await import("./midi");
-				midiData=decodeMidi(MIDI_DATA_URI);
-			}
-			catch (e){
-				console.error("MIDI load failed:", e);
-				return;
-			}
+			let [{MIDI_DATA_URI}, {Midi}]=await Promise.all([import("./midi"), import("@tonejs/midi")]);
+			midiData=decodeMidi(MIDI_DATA_URI, Midi);
 		}
-		// Tone builds its AudioContext while the module is evaluated, so it is imported on the
-		// first real interaction instead of on load. Autoplay policies then allow it to start.
+		// Tone builds its AudioContext while the module is evaluated, so it is imported here, from
+		// the start button click, instead of on load. Autoplay policies then allow it to start.
 		let tone=await import("tone");
 		if (!synth) initAudio(tone);
 		await tone.start();
@@ -71,7 +67,7 @@ async function startMusic(){
 		}
 		midiLoop?.stop();
 		midiLoop?.dispose();
-		let startTime=tone.now()+0.1;
+		let startTime=tone.now()+.1;
 		midiLoop=new tone.Loop((time)=>{
 			midiData!.tracks.forEach(track=>{
 				track.notes.forEach(n=>{
@@ -82,17 +78,10 @@ async function startMusic(){
 		midiLoop.start(startTime);
 		isPlaying=true;
 	}
+	catch (e){
+		console.error("Music failed to start:", e);
+	}
 	finally{
 		starting=false;
 	}
 }
-let unlockAndPlay=async ()=>{
-	await startMusic();
-	if (isPlaying&&synth&&synth.context.state=="running"){
-		window.removeEventListener("pointerdown", unlockAndPlay);
-		window.removeEventListener("keydown", unlockAndPlay);
-	}
-};
-// Registered synchronously so the very first interaction is never missed.
-window.addEventListener("pointerdown", unlockAndPlay);
-window.addEventListener("keydown", unlockAndPlay);
