@@ -59,6 +59,12 @@ async function startMusic(){
 		let tone=await import("tone");
 		if (!synth) initAudio(tone);
 		await tone.start();
+		// Tone boots with the Transport stopped, so its clock never ticks and anything scheduled
+		// through it, such as the Loop below, would silently never fire. Start it first.
+		let transport=tone.getTransport();
+		if (transport.state!="started"){
+			transport.start();
+		}
 		if (midiData.header.tempos.length){
 			let bpm=midiData.header.tempos[0].bpm;
 			synth!.context.transport.bpm.value=bpm;
