@@ -2,13 +2,40 @@ import type {Game} from "./state";
 const cursorSpeedEl=document.getElementById("cursor-speed")!;
 const cursorMaxSpeedEl=document.getElementById("cursor-max-speed")!;
 const cursorScoreEl=document.getElementById("cursor-score")!;
-function renderSky(game: Game){
-	let {config, ctx}=game;
-	let grad=ctx.createLinearGradient(0, 0, 0, config.height);
+// The sky only changes when the canvas is resized, so it is painted once into an offscreen canvas and
+// blitted from then on. Evaluating that gradient over the whole canvas every frame was the most
+// expensive single thing the renderer did.
+let skyLayer: HTMLCanvasElement|null=null;
+let skyLayerWidth=0;
+let skyLayerHeight=0;
+function ensureSkyLayer(game: Game){
+	let {config}=game;
+	if (!skyLayer){
+		skyLayer=document.createElement("canvas");
+	}
+	if (skyLayerWidth==config.width&&skyLayerHeight==config.height){
+		return;
+	}
+	skyLayerWidth=config.width;
+	skyLayerHeight=config.height;
+	skyLayer.width=config.width;
+	skyLayer.height=config.height;
+	let layerCtx=skyLayer.getContext("2d");
+	if (!layerCtx){
+		return;
+	}
+	let grad=layerCtx.createLinearGradient(0, 0, 0, config.height);
 	grad.addColorStop(0, config.skyGradient[0]);
 	grad.addColorStop(1, config.skyGradient[1]);
-	ctx.fillStyle=grad;
-	ctx.fillRect(0, 0, config.width, config.height);
+	layerCtx.fillStyle=grad;
+	layerCtx.fillRect(0, 0, config.width, config.height);
+}
+function renderSky(game: Game){
+	let {ctx}=game;
+	ensureSkyLayer(game);
+	if (skyLayer&&skyLayerWidth>0&&skyLayerHeight>0){
+		ctx.drawImage(skyLayer, 0, 0);
+	}
 }
 function renderTerrain(game: Game){
 	let {config, ctx, state}=game;
